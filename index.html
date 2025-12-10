@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Catastro Wanchaq 2025 - 3D</title>
+    <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
+    <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+    <script src="https://unpkg.com/simple-statistics@7.8.3/dist/simple-statistics.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <script src="alturas.js"></script>
+
+    <style>
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden;
+            font-family: 'Roboto', sans-serif;
+            background-color: #0f172a;
+            color: white;
+        }
+
+        #map {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 100%;
+        }
+
+        .ui-panel {
+            background: rgba(15, 23, 42, 0.9);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+            padding: 12px;
+            pointer-events: auto;
+        }
+
+        /* TOP LEFT: BRANDING */
+        .branding-container {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 20;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding-right: 20px;
+        }
+
+        .logo-img {
+            height: 50px;
+            width: auto;
+        }
+
+        .main-title h1 {
+            margin: 0;
+            font-size: 1.2rem;
+            font-weight: 800;
+            color: #ef4444;
+            letter-spacing: 1px;
+        }
+
+        .main-title span {
+            font-size: 0.75rem;
+            color: #cbd5e1;
+            text-transform: uppercase;
+        }
+
+        /* BOTTOM RIGHT: CHART (Moved here to avoid overlap) */
+        .dashboard-container {
+            position: absolute;
+            bottom: 30px;
+            right: 20px;
+            z-index: 20;
+            width: 320px;
+            max-height: 280px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chart-title {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #e2e8f0;
+            margin-bottom: 8px;
+            border-bottom: 1px solid #334155;
+            padding-bottom: 4px;
+        }
+
+        .chart-wrapper {
+            position: relative;
+            height: 180px;
+            width: 100%;
+        }
+
+        .kpi-row {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 8px;
+            font-size: 0.75rem;
+            color: #94a3b8;
+        }
+
+        /* TOP LEFT (BELOW HEADER): LEGEND */
+        .legend-container {
+            position: absolute;
+            top: 90px;
+            left: 20px;
+            z-index: 20;
+            min-width: 160px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 4px;
+            font-size: 0.75rem;
+            color: #cbd5e1;
+        }
+
+        .legend-color {
+            width: 14px;
+            height: 14px;
+            margin-right: 8px;
+            border-radius: 3px;
+        }
+
+        /* TOP RIGHT: TOOLS */
+        .controls-container {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 20;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .btn-tool {
+            background: #1e293b;
+            color: #f8fafc;
+            border: 1px solid #475569;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            font-weight: 500;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-tool:hover {
+            background: #334155;
+            border-color: #64748b;
+        }
+
+        .btn-active {
+            background: #ef4444 !important;
+            border-color: #ef4444 !important;
+        }
+
+        /* POPUP */
+        .maplibregl-popup-content {
+            background: linear-gradient(135deg, rgba(15, 23, 42, 0.98), rgba(30, 41, 59, 0.98));
+            color: #f1f5f9;
+            border: 1px solid rgba(71, 85, 105, 0.6);
+            border-radius: 8px;
+            padding: 14px 16px;
+            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.05);
+            min-width: 260px;
+        }
+
+        .maplibregl-popup-close-button {
+            color: #cbd5e1;
+            font-size: 18px;
+            padding: 4px 8px;
+            transition: color 0.2s;
+        }
+
+        .maplibregl-popup-close-button:hover {
+            color: #ef4444;
+        }
+
+        .maplibregl-popup-tip {
+            border-top-color: rgba(15, 23, 42, 0.98);
+        }
+
+        .prop-table {
+            width: 100%;
+            font-size: 0.8rem;
+            border-collapse: collapse;
+        }
+
+        .prop-table td {
+            padding: 6px 0;
+            border-bottom: 1px solid rgba(51, 65, 85, 0.5);
+        }
+
+        .prop-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        #loading {
+            position: fixed;
+            inset: 0;
+            background: #0f172a;
+            z-index: 9999;
+            display: grid;
+            place-items: center;
+            color: white;
+            font-weight: 300;
+            letter-spacing: 2px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="loading">CARGANDO VISOR 3D...</div>
+    <div id="map"></div>
+
+    <!-- HEADER -->
+    <div class="ui-panel branding-container">
+        <img src="logos/LOGO WANCHAQ 2025_v4_SF.png" class="logo-img" alt="Logo">
+        <img src="logos/LOGO_CATW_2025_v7_SF.png" class="logo-img" alt="Logo">
+        <div class="main-title">
+            <h1>CATASTRO WANCHAQ</h1>
+            <span>Modelo 3D - 2025</span>
+        </div>
+    </div>
+
+    <!-- TOOLS -->
+    <div class="controls-container">
+        <button class="btn-tool" onclick="resetView()">🏠 Reset Vista</button>
+        <button class="btn-tool" onclick="togglePitch()">📐 2D / 3D</button>
+        <button class="btn-tool" id="btn-underground" onclick="toggleUnderground()">🕶️ Ver Sótanos</button>
+        <button class="btn-tool" onclick="goToBasements()">⬇️ Ir a Sótanos</button>
+    </div>
+
+    <!-- LEGEND -->
+    <div class="ui-panel legend-container">
+        <div class="chart-title" style="margin-bottom:8px;">Leyenda de Alturas</div>
+        <div id="legend-content"></div>
+        <div class="legend-item" style="margin-top:8px; padding-top:4px; border-top:1px solid #334155;">
+            <div class="legend-color" style="background:#3b82f6;"></div> Sótanos (< 0m) </div>
+                <div
+                    style="font-size:0.65rem; color:#64748b; margin-top:8px; padding:6px; background:rgba(30,41,59,0.5); border-radius:4px;">
+                    💡 <b>Tip:</b> Arrastra con botón derecho para rotar y ver la profundidad de los sótanos
+                </div>
+        </div>
+
+        <!-- DASHBOARD -->
+        <div class="ui-panel dashboard-container">
+            <div class="chart-title">Distribución por Pisos</div>
+            <div class="chart-wrapper">
+                <canvas id="pisoChart"></canvas>
+            </div>
+            <div class="kpi-row">
+                <span>Total Pisos: <b id="total-lotes" style="color:white;">0</b></span>
+                <span>Sótanos Identificados: <b id="total-sotanos" style="color:#3b82f6;">0</b></span>
+            </div>
+        </div>
+
+        <script>
+            const map = new maplibregl.Map({
+                container: 'map',
+                style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
+                center: [-71.95, -13.535],
+                zoom: 16,
+                pitch: 60,
+                bearing: -20,
+                antialias: true
+            });
+            map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-left'); // Moved to bottom-left to sit near legend
+
+            // Colors (Magma-ish for buildings)
+            const colors = ['#fde0dd', '#fa9fb5', '#e7e1ef', '#c994c7', '#dd1c77'];
+            // Or a cleaner sequential ramp
+            const rampColors = ['#FEF0D9', '#FDCC8A', '#FC8D59', '#E34A33', '#B30000'];
+
+            let isUnderground = false;
+
+            map.on('load', () => {
+                const features = alturas.features;
+
+                // Helper function to check if floor is mezzanine
+                const isMezzanine = (codi_piso) => {
+                    return codi_piso === '71';
+                };
+
+                // Separate data for Stats
+                const positiveHeights = [];
+                let sotanoCount = 0;
+
+                features.forEach(f => {
+                    const h = f.properties.altura;
+                    if (h >= 0) positiveHeights.push(h);
+                    if (h < 0) sotanoCount++;
+                });
+
+                // Natural Breaks for Positive Heights
+                let breaks = [0, 5, 10, 15, 20];
+                if (positiveHeights.length > 5) {
+                    const clusters = ss.ckmeans(positiveHeights, 5);
+                    breaks = clusters.map(c => c[c.length - 1]);
+                }
+
+                // --- 1. LEGEND ---
+                const legendDiv = document.getElementById('legend-content');
+                let prev = 0;
+                breaks.forEach((b, i) => {
+                    const div = document.createElement('div');
+                    div.className = 'legend-item';
+                    div.innerHTML = `<div class="legend-color" style="background:${rampColors[i]}"></div> ${prev.toFixed(1)}m - ${b.toFixed(1)}m`;
+                    legendDiv.appendChild(div);
+                    prev = b;
+                });
+
+                // --- 2. LAYER LOGIC ---
+                // Color Logic: Blue for basements (altura < 0), gradient for buildings
+                const colorExpr = ['case',
+                    ['<', ['get', 'altura'], 0], '#3b82f6', // Blue for basement
+
+                    // Else Ramp
+                    ['step', ['get', 'altura'], rampColors[0],
+                        breaks[0], rampColors[1],
+                        breaks[1], rampColors[2],
+                        breaks[2], rampColors[3],
+                        breaks[3], rampColors[4]
+                    ]
+                ];
+
+                // Debug: Log basement data
+                const basementFeatures = features.filter(f => f.properties.altura < 0);
+                console.log('=== BASEMENT DEBUG ===');
+                console.log('Total features:', features.length);
+                console.log('Basement features:', basementFeatures.length);
+                if (basementFeatures.length > 0) {
+                    console.log('Sample basement:', basementFeatures[0].properties);
+                    console.log('Sample altura:', basementFeatures[0].properties.altura);
+                }
+
+                // SOLUTION: MapLibre cannot render below z=0 (ground level)
+                // Use minimal offset (3m) to elevate buildings slightly
+                // Basements: base=0, height=abs(altura) (e.g., abs(-2.75)=2.75m) - REAL SIZE, reaches to floor 01
+                // Buildings: base=offset, height=offset+altura (e.g., base=3, height=3+2.75=5.75m)
+                // This creates continuity: Sótano 81 (0 to 2.75m) → Piso 01 (3m to 5.75m)
+
+                const ELEVATION_OFFSET = 3; // Minimal offset (3m = typical floor height)
+
+                map.addSource('wanchaq', { type: 'geojson', data: alturas });
+
+                map.addLayer({
+                    'id': 'buildings-3d',
+                    'type': 'fill-extrusion',
+                    'source': 'wanchaq',
+                    'paint': {
+                        'fill-extrusion-color': colorExpr,
+                        // Height calculation
+                        'fill-extrusion-height': [
+                            'case',
+                            ['<', ['get', 'altura'], 0],
+                            // Basements: use ABSOLUTE value of altura
+                            // e.g., abs(-2.75) = 2.75m (reaches almost to floor 01 at 3m)
+                            ['abs', ['get', 'altura']],
+                            // Regular buildings: offset + altura
+                            // e.g., 3 + 2.75 = 5.75m
+                            ['+', ELEVATION_OFFSET, ['get', 'altura']]
+                        ],
+                        // Base calculation
+                        'fill-extrusion-base': [
+                            'case',
+                            ['<', ['get', 'altura'], 0],
+                            0, // Basements start at ground level (z=0)
+                            ELEVATION_OFFSET // Regular buildings start at offset (z=3m = floor 01 level)
+                        ],
+                        'fill-extrusion-opacity': 0.9
+                    }
+                });
+
+                // --- 3. CHART ---
+                const pisoMap = {};
+                features.forEach(f => {
+                    const p = f.properties.codi_piso || 'N/D';
+                    pisoMap[p] = (pisoMap[p] || 0) + 1;
+                });
+                const labels = Object.keys(pisoMap).sort();
+                const data = labels.map(l => pisoMap[l]);
+
+                document.getElementById('total-lotes').innerText = features.length.toLocaleString();
+                document.getElementById('total-sotanos').innerText = sotanoCount;
+
+                new Chart(document.getElementById('pisoChart'), {
+                    type: 'bar',
+                    data: {
+                        labels,
+                        datasets: [{
+                            label: 'Lotes',
+                            data,
+                            backgroundColor: '#ef4444',
+                            borderRadius: 3,
+                            hoverBackgroundColor: '#dc2626',
+                            minBarLength: 3 // Minimum bar height for visibility
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: {
+                            mode: 'nearest',
+                            intersect: false,
+                            axis: 'x'
+                        },
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                enabled: true,
+                                backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                                titleColor: '#f1f5f9',
+                                bodyColor: '#cbd5e1',
+                                borderColor: '#475569',
+                                borderWidth: 1,
+                                padding: 12,
+                                displayColors: false,
+                                callbacks: {
+                                    title: function (context) {
+                                        return 'Piso ' + context[0].label;
+                                    },
+                                    label: function (context) {
+                                        return 'Cantidad: ' + context.parsed.y + ' Pisos';
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                grid: { color: '#334155' },
+                                ticks: {
+                                    color: '#94a3b8',
+                                    font: { size: 10 },
+                                    precision: 0
+                                }
+                            },
+                            x: {
+                                grid: { display: false },
+                                ticks: {
+                                    color: '#94a3b8',
+                                    font: { size: 10 }
+                                }
+                            }
+                        }
+                    }
+                });
+
+                document.getElementById('loading').style.display = 'none';
+            });
+
+            // --- INTERACTION ---
+            map.on('click', 'buildings-3d', (e) => {
+                const p = e.features[0].properties;
+                const codiPiso = p.codi_piso || '-';
+                const altura = Number(p.altura);
+
+                // Determine floor type
+                const isSotano = altura < 0;
+                const isEntresuelo = codiPiso === '71';
+
+                // Set title and badge
+                let title = "Detalle de Predio";
+                let badge = "";
+                let badgeColor = "#64748b";
+
+                if (isSotano) {
+                    title = "Detalle de Sótano";
+                    badge = "SÓTANO";
+                    badgeColor = "#3b82f6";
+                } else if (isEntresuelo) {
+                    title = "Detalle de Entresuelo";
+                    badge = "ENTRESUELO";
+                    badgeColor = "#8b5cf6";
+                }
+
+                // Get floor label
+                let floorLabel = codiPiso;
+                if (isSotano) {
+                    floorLabel = `Sótano (${codiPiso})`;
+                } else if (isEntresuelo) {
+                    floorLabel = 'Entresuelo';
+                } else if (codiPiso !== '-') {
+                    floorLabel = `Piso ${codiPiso}`;
+                }
+
+                const html = `
+                <div style="margin-bottom:10px;">
+                    <div style="font-weight:700; color:#ef4444; font-size:0.95rem; margin-bottom:4px;">${title}</div>
+                    ${badge ? `<div style="display:inline-block; background:${badgeColor}; color:white; padding:2px 8px; border-radius:3px; font-size:0.65rem; font-weight:600; letter-spacing:0.5px;">${badge}</div>` : ''}
+                </div>
+                <table class="prop-table" style="font-size:0.8rem;">
+                    <tr>
+                        <td style="color:#94a3b8; padding-right:12px;">Referencia Catastral</td>
+                        <td style="font-weight:500; color:#f1f5f9;">${p.id_lote || '-'}</td>
+                    </tr>
+                    <tr>
+                        <td style="color:#94a3b8; padding-right:12px;">Sector</td>
+                        <td style="font-weight:500; color:#f1f5f9;">${p.cod_sector || '-'}</td>
+                    </tr>
+                    <tr>
+                        <td style="color:#94a3b8; padding-right:12px;">Nivel</td>
+                        <td style="font-weight:500; color:#f1f5f9;">${floorLabel}</td>
+                    </tr>
+                    <tr>
+                        <td style="color:#94a3b8; padding-right:12px;">Altura</td>
+                        <td style="font-weight:600; color:${isSotano ? '#3b82f6' : '#10b981'};">${altura.toFixed(2)} m</td>
+                    </tr>
+                    ${p.area_grafica ? `<tr>
+                        <td style="color:#94a3b8; padding-right:12px;">Área Gráfica</td>
+                        <td style="font-weight:500; color:#f1f5f9;">${Number(p.area_grafica).toFixed(2)} m²</td>
+                    </tr>` : ''}
+                </table>
+            `;
+                new maplibregl.Popup({ closeButton: true, maxWidth: '280px' })
+                    .setLngLat(e.lngLat)
+                    .setHTML(html)
+                    .addTo(map);
+            });
+
+            // --- CONTROLS ---
+            function resetView() {
+                map.flyTo({ center: [-71.95, -13.535], zoom: 16, pitch: 60, bearing: -20 });
+
+                // Restore base map if in underground mode
+                if (isUnderground) {
+                    toggleUnderground();
+                }
+            }
+            function togglePitch() {
+                map.easeTo({ pitch: map.getPitch() > 10 ? 0 : 60 });
+            }
+
+            function goToBasements() {
+                // Fly to a location with basements (from the data: sector 08, with codi_piso 81)
+                map.flyTo({
+                    center: [-71.9458, -13.5378], // Area with basements
+                    zoom: 19, // Closer zoom to see depth better
+                    pitch: 75, // More dramatic angle to see depth
+                    bearing: -60, // Better angle to see extrusion
+                    duration: 2000
+                });
+
+                // Activate underground view after a short delay
+                setTimeout(() => {
+                    if (!isUnderground) {
+                        toggleUnderground();
+                    }
+                }, 2100);
+            }
+
+            function toggleUnderground() {
+                isUnderground = !isUnderground;
+                const btn = document.getElementById('btn-underground');
+
+                if (isUnderground) {
+                    btn.classList.add('btn-active');
+                    // Make ALL base map layers transparent to see basements
+                    map.getStyle().layers.forEach(layer => {
+                        // Skip our buildings layer
+                        if (layer.id === 'buildings-3d') return;
+
+                        // Make all other layers transparent
+                        if (layer.type === 'background') {
+                            map.setPaintProperty(layer.id, 'background-opacity', 0);
+                        } else if (layer.type === 'fill') {
+                            map.setPaintProperty(layer.id, 'fill-opacity', 0);
+                        } else if (layer.type === 'line') {
+                            map.setPaintProperty(layer.id, 'line-opacity', 0);
+                        } else if (layer.type === 'symbol') {
+                            map.setLayoutProperty(layer.id, 'visibility', 'none');
+                        } else if (layer.type === 'raster') {
+                            map.setPaintProperty(layer.id, 'raster-opacity', 0);
+                        }
+                    });
+
+                } else {
+                    btn.classList.remove('btn-active');
+                    // Restore all base map layers
+                    map.getStyle().layers.forEach(layer => {
+                        if (layer.id === 'buildings-3d') return;
+
+                        if (layer.type === 'background') {
+                            map.setPaintProperty(layer.id, 'background-opacity', 1);
+                        } else if (layer.type === 'fill') {
+                            map.setPaintProperty(layer.id, 'fill-opacity', 1);
+                        } else if (layer.type === 'line') {
+                            map.setPaintProperty(layer.id, 'line-opacity', 1);
+                        } else if (layer.type === 'symbol') {
+                            map.setLayoutProperty(layer.id, 'visibility', 'visible');
+                        } else if (layer.type === 'raster') {
+                            map.setPaintProperty(layer.id, 'raster-opacity', 1);
+                        }
+                    });
+                }
+            }
+        </script>
+</body>
+
+</html>
