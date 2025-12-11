@@ -71,11 +71,11 @@
             text-transform: uppercase;
         }
 
-        /* BOTTOM RIGHT: CHART (Moved here to avoid overlap) */
+        /* BOTTOM LEFT: CHART */
         .dashboard-container {
             position: absolute;
             bottom: 30px;
-            right: 20px;
+            left: 20px;
             z-index: 20;
             width: 320px;
             max-height: 280px;
@@ -218,6 +218,23 @@
             font-weight: 300;
             letter-spacing: 2px;
         }
+
+        /* Mezzanine highlight animation */
+        @keyframes mezzanine-pulse {
+
+            0%,
+            100% {
+                box-shadow: 0 0 5px rgba(6, 182, 212, 0.5);
+            }
+
+            50% {
+                box-shadow: 0 0 15px rgba(6, 182, 212, 0.9);
+            }
+        }
+
+        .legend-color.mezzanine-highlight {
+            animation: mezzanine-pulse 2s ease-in-out infinite;
+        }
     </style>
 </head>
 
@@ -242,263 +259,603 @@
         <button class="btn-tool" onclick="togglePitch()">📐 2D / 3D</button>
         <button class="btn-tool" id="btn-underground" onclick="toggleUnderground()">🕶️ Ver Sótanos</button>
         <button class="btn-tool" onclick="goToBasements()">⬇️ Ir a Sótanos</button>
+        <button class="btn-tool" id="btn-layers" onclick="toggleLayerPanel()">🗂️ Capas</button>
+        <button class="btn-tool" id="btn-basemap" onclick="toggleBasemapPanel()">🗺️ Mapa Base</button>
+    </div>
+
+    <!-- BASEMAP SELECTOR PANEL -->
+    <div class="ui-panel" id="basemap-panel"
+        style="position:absolute; top:280px; right:20px; z-index:20; display:none; min-width:180px;">
+        <div class="chart-title" style="margin-bottom:12px;">🗺️ Mapa Base</div>
+        <div style="display:flex; flex-direction:column; gap:8px;">
+            <button onclick="setBasemap('streets')" class="basemap-option basemap-active" id="basemap-streets"
+                style="padding:8px; background:#334155; color:#f8fafc; border:1px solid #475569; border-radius:4px; cursor:pointer; font-size:0.8rem; text-align:left;">
+                🌍 Calles (OSM)
+            </button>
+            <button onclick="setBasemap('satellite')" class="basemap-option" id="basemap-satellite"
+                style="padding:8px; background:#334155; color:#f8fafc; border:1px solid #475569; border-radius:4px; cursor:pointer; font-size:0.8rem; text-align:left;">
+                🛰️ Satélite
+            </button>
+            <button onclick="setBasemap('dark')" class="basemap-option" id="basemap-dark"
+                style="padding:8px; background:#334155; color:#f8fafc; border:1px solid #475569; border-radius:4px; cursor:pointer; font-size:0.8rem; text-align:left;">
+                🌙 Oscuro
+            </button>
+            <button onclick="setBasemap('none')" class="basemap-option" id="basemap-none"
+                style="padding:8px; background:#334155; color:#f8fafc; border:1px solid #475569; border-radius:4px; cursor:pointer; font-size:0.8rem; text-align:left;">
+                ⬜ Sin Mapa
+            </button>
+        </div>
+    </div>
+
+    <!-- LAYER CONTROL PANEL -->
+    <div class="ui-panel" id="layer-panel"
+        style="position:absolute; top:20px; right:220px; z-index:20; display:none; min-width:240px; max-height:80vh; overflow-y:auto;">
+        <div class="chart-title" style="margin-bottom:12px;">🗂️ Control de Capas</div>
+
+        <!-- Sótanos -->
+        <div style="margin-bottom:16px; padding-bottom:12px; border-bottom:1px solid #334155;">
+            <div style="font-size:0.75rem; color:#94a3b8; margin-bottom:8px; font-weight:600;">SÓTANOS (Profundidad)
+            </div>
+            <div style="display:flex; flex-direction:column; gap:6px;">
+                <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.8rem;">
+                    <input type="checkbox" class="floor-toggle" data-floor="81" checked style="cursor:pointer;">
+                    <span
+                        style="display:inline-block; width:12px; height:12px; background:#06b6d4; border-radius:2px;"></span>
+                    <span>Sótano 81 (Superficial)</span>
+                </label>
+                <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.8rem;">
+                    <input type="checkbox" class="floor-toggle" data-floor="82" checked style="cursor:pointer;">
+                    <span
+                        style="display:inline-block; width:12px; height:12px; background:#0284c7; border-radius:2px;"></span>
+                    <span>Sótano 82 (Medio)</span>
+                </label>
+                <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.8rem;">
+                    <input type="checkbox" class="floor-toggle" data-floor="83" checked style="cursor:pointer;">
+                    <span
+                        style="display:inline-block; width:12px; height:12px; background:#003597; border-radius:2px;"></span>
+                    <span>Sótano 83 (Profundo)</span>
+                </label>
+            </div>
+        </div>
+
+        <!-- Mezzanines -->
+        <div style="margin-bottom:16px; padding-bottom:12px; border-bottom:1px solid #334155;">
+            <div style="font-size:0.75rem; color:#94a3b8; margin-bottom:8px; font-weight:600;">ENTRESUELOS</div>
+            <div style="display:flex; flex-direction:column; gap:6px;">
+                <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.8rem;">
+                    <input type="checkbox" id="toggle-mezzanine" class="floor-toggle" data-floor="71"
+                        style="cursor:pointer;">
+                    <span>🟣 Mezzanine 71</span>
+                </label>
+            </div>
+        </div>
+
+        <!-- Pisos Regulares -->
+        <div style="margin-bottom:8px;">
+            <div style="font-size:0.75rem; color:#94a3b8; margin-bottom:8px; font-weight:600;">PISOS REGULARES</div>
+            <div style="display:flex; flex-direction:column; gap:6px;">
+                <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.8rem;">
+                    <input type="checkbox" class="floor-toggle" data-floor="01" checked style="cursor:pointer;">
+                    <span>🔴 Piso 01</span>
+                </label>
+                <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.8rem;">
+                    <input type="checkbox" class="floor-toggle" data-floor="02" checked style="cursor:pointer;">
+                    <span>🔴 Piso 02</span>
+                </label>
+                <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.8rem;">
+                    <input type="checkbox" class="floor-toggle" data-floor="03" checked style="cursor:pointer;">
+                    <span>🔴 Piso 03</span>
+                </label>
+                <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.8rem;">
+                    <input type="checkbox" class="floor-toggle" data-floor="04" checked style="cursor:pointer;">
+                    <span>🔴 Piso 04</span>
+                </label>
+                <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.8rem;">
+                    <input type="checkbox" class="floor-toggle" data-floor="05" checked style="cursor:pointer;">
+                    <span>🔴 Piso 05</span>
+                </label>
+                <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.8rem;">
+                    <input type="checkbox" class="floor-toggle" data-floor="06" checked style="cursor:pointer;">
+                    <span>🔴 Piso 06</span>
+                </label>
+                <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.8rem;">
+                    <input type="checkbox" class="floor-toggle" data-floor="07" checked style="cursor:pointer;">
+                    <span>🔴 Piso 07</span>
+                </label>
+                <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.8rem;">
+                    <input type="checkbox" class="floor-toggle" data-floor="08" checked style="cursor:pointer;">
+                    <span>🔴 Piso 08</span>
+                </label>
+                <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.8rem;">
+                    <input type="checkbox" class="floor-toggle" data-floor="09" checked style="cursor:pointer;">
+                    <span>🔴 Piso 09</span>
+                </label>
+                <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.8rem;">
+                    <input type="checkbox" class="floor-toggle" data-floor="10" checked style="cursor:pointer;">
+                    <span>🔴 Piso 10</span>
+                </label>
+                <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.8rem;">
+                    <input type="checkbox" class="floor-toggle" data-floor="11" checked style="cursor:pointer;">
+                    <span>🔴 Piso 11</span>
+                </label>
+                <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.8rem;">
+                    <input type="checkbox" class="floor-toggle" data-floor="12" checked style="cursor:pointer;">
+                    <span>🔴 Piso 12</span>
+                </label>
+            </div>
+        </div>
+
+        <!-- Botones de acción rápida -->
+        <div style="display:flex; gap:6px; margin-top:12px; padding-top:12px; border-top:1px solid #334155;">
+            <button onclick="toggleAllFloors(true)"
+                style="flex:1; padding:6px; background:#334155; color:#f8fafc; border:1px solid #475569; border-radius:4px; cursor:pointer; font-size:0.75rem;">
+                ✓ Todos
+            </button>
+            <button onclick="toggleAllFloors(false)"
+                style="flex:1; padding:6px; background:#334155; color:#f8fafc; border:1px solid #475569; border-radius:4px; cursor:pointer; font-size:0.75rem;">
+                ✗ Ninguno
+            </button>
+        </div>
     </div>
 
     <!-- LEGEND -->
     <div class="ui-panel legend-container">
         <div class="chart-title" style="margin-bottom:8px;">Leyenda de Alturas</div>
         <div id="legend-content"></div>
-        <div class="legend-item" style="margin-top:8px; padding-top:4px; border-top:1px solid #334155;">
-            <div class="legend-color" style="background:#3b82f6;"></div> Sótanos (< 0m) </div>
-                <div
-                    style="font-size:0.65rem; color:#64748b; margin-top:8px; padding:6px; background:rgba(30,41,59,0.5); border-radius:4px;">
-                    💡 <b>Tip:</b> Arrastra con botón derecho para rotar y ver la profundidad de los sótanos
-                </div>
-        </div>
-
-        <!-- DASHBOARD -->
-        <div class="ui-panel dashboard-container">
-            <div class="chart-title">Distribución por Pisos</div>
-            <div class="chart-wrapper">
-                <canvas id="pisoChart"></canvas>
+        <div style="margin-top:8px; padding-top:8px; border-top:1px solid #334155;">
+            <div style="font-size:0.75rem; color:#94a3b8; margin-bottom:6px; font-weight:600;">SÓTANOS (Profundidad)
             </div>
-            <div class="kpi-row">
-                <span>Total Pisos: <b id="total-lotes" style="color:white;">0</b></span>
-                <span>Sótanos Identificados: <b id="total-sotanos" style="color:#3b82f6;">0</b></span>
+            <div class="legend-item">
+                <div class="legend-color" style="background:#06b6d4;"></div> Sótano 81 (Superficial)
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background:#0284c7;"></div> Sótano 82 (Medio)
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background:#003597;"></div> Sótano 83 (Profundo)
             </div>
         </div>
+        <div class="legend-item" style="margin-top:8px; padding-top:8px; border-top:1px solid #334155;">
+            <div class="legend-color mezzanine-highlight"
+                style="background:#8b5cf6; opacity:0.5; border:2px solid #06b6d4;"></div>
+            Mezzanine (Entrepiso)(71)
+        </div>
+        <div
+            style="font-size:0.65rem; color:#64748b; margin-top:8px; padding:6px; background:rgba(30,41,59,0.5); border-radius:4px;">
+            💡 <b>Tip OASIS:</b> Los colores de sótanos simulan <span style="color:#06b6d4;">profundidad
+                subterránea</span> (claro a oscuro).
+        </div>
+    </div>
 
-        <script>
-            const map = new maplibregl.Map({
-                container: 'map',
-                style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
-                center: [-71.95, -13.535],
-                zoom: 16,
-                pitch: 60,
-                bearing: -20,
-                antialias: true
-            });
-            map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-left'); // Moved to bottom-left to sit near legend
+    <!-- DASHBOARD -->
+    <div class="ui-panel dashboard-container">
+        <div class="chart-title">📊 Análisis - Distribución Vertical</div>
+        <div class="chart-wrapper">
+            <canvas id="pisoChart"></canvas>
+        </div>
+        <div class="kpi-row"
+            style="flex-direction:column; gap:6px; margin-top:12px; padding-top:8px; border-top:1px solid #334155;">
+            <div style="display:flex; justify-content:space-between; width:100%;">
+                <span>Total Bloques:</span>
+                <b id="total-lotes" style="color:white;">0</b>
+            </div>
+            <div style="display:flex; justify-content:space-between; width:100%;">
+                <span>🌊 Sótanos:</span>
+                <b id="total-sotanos" style="color:#06b6d4;">0</b>
+            </div>
+            <div style="display:flex; justify-content:space-between; width:100%;">
+                <span>🟣 Mezzanines:</span>
+                <b id="total-mezzanines" style="color:#8b5cf6;">0</b>
+            </div>
+            <div style="display:flex; justify-content:space-between; width:100%;">
+                <span>📏 Altura Máx Estimada:</span>
+                <b id="max-height" style="color:#10b981;">0m</b>
+            </div>
+        </div>
+    </div>
 
-            // Colors (Magma-ish for buildings)
-            const colors = ['#fde0dd', '#fa9fb5', '#e7e1ef', '#c994c7', '#dd1c77'];
-            // Or a cleaner sequential ramp
-            const rampColors = ['#FEF0D9', '#FDCC8A', '#FC8D59', '#E34A33', '#B30000'];
-
-            let isUnderground = false;
-
-            map.on('load', () => {
-                const features = alturas.features;
-
-                // Helper function to check if floor is mezzanine
-                const isMezzanine = (codi_piso) => {
-                    return codi_piso === '71';
-                };
-
-                // Separate data for Stats
-                const positiveHeights = [];
-                let sotanoCount = 0;
-
-                features.forEach(f => {
-                    const h = f.properties.altura;
-                    if (h >= 0) positiveHeights.push(h);
-                    if (h < 0) sotanoCount++;
-                });
-
-                // Natural Breaks for Positive Heights
-                let breaks = [0, 5, 10, 15, 20];
-                if (positiveHeights.length > 5) {
-                    const clusters = ss.ckmeans(positiveHeights, 5);
-                    breaks = clusters.map(c => c[c.length - 1]);
-                }
-
-                // --- 1. LEGEND ---
-                const legendDiv = document.getElementById('legend-content');
-                let prev = 0;
-                breaks.forEach((b, i) => {
-                    const div = document.createElement('div');
-                    div.className = 'legend-item';
-                    div.innerHTML = `<div class="legend-color" style="background:${rampColors[i]}"></div> ${prev.toFixed(1)}m - ${b.toFixed(1)}m`;
-                    legendDiv.appendChild(div);
-                    prev = b;
-                });
-
-                // --- 2. LAYER LOGIC ---
-                // Color Logic: Blue for basements (altura < 0), gradient for buildings
-                const colorExpr = ['case',
-                    ['<', ['get', 'altura'], 0], '#3b82f6', // Blue for basement
-
-                    // Else Ramp
-                    ['step', ['get', 'altura'], rampColors[0],
-                        breaks[0], rampColors[1],
-                        breaks[1], rampColors[2],
-                        breaks[2], rampColors[3],
-                        breaks[3], rampColors[4]
-                    ]
-                ];
-
-                // Debug: Log basement data
-                const basementFeatures = features.filter(f => f.properties.altura < 0);
-                console.log('=== BASEMENT DEBUG ===');
-                console.log('Total features:', features.length);
-                console.log('Basement features:', basementFeatures.length);
-                if (basementFeatures.length > 0) {
-                    console.log('Sample basement:', basementFeatures[0].properties);
-                    console.log('Sample altura:', basementFeatures[0].properties.altura);
-                }
-
-                // SOLUTION: MapLibre cannot render below z=0 (ground level)
-                // Use minimal offset (3m) to elevate buildings slightly
-                // Basements: base=0, height=abs(altura) (e.g., abs(-2.75)=2.75m) - REAL SIZE, reaches to floor 01
-                // Buildings: base=offset, height=offset+altura (e.g., base=3, height=3+2.75=5.75m)
-                // This creates continuity: Sótano 81 (0 to 2.75m) → Piso 01 (3m to 5.75m)
-
-                const ELEVATION_OFFSET = 3; // Minimal offset (3m = typical floor height)
-
-                map.addSource('wanchaq', { type: 'geojson', data: alturas });
-
-                map.addLayer({
-                    'id': 'buildings-3d',
-                    'type': 'fill-extrusion',
-                    'source': 'wanchaq',
-                    'paint': {
-                        'fill-extrusion-color': colorExpr,
-                        // Height calculation
-                        'fill-extrusion-height': [
-                            'case',
-                            ['<', ['get', 'altura'], 0],
-                            // Basements: use ABSOLUTE value of altura
-                            // e.g., abs(-2.75) = 2.75m (reaches almost to floor 01 at 3m)
-                            ['abs', ['get', 'altura']],
-                            // Regular buildings: offset + altura
-                            // e.g., 3 + 2.75 = 5.75m
-                            ['+', ELEVATION_OFFSET, ['get', 'altura']]
-                        ],
-                        // Base calculation
-                        'fill-extrusion-base': [
-                            'case',
-                            ['<', ['get', 'altura'], 0],
-                            0, // Basements start at ground level (z=0)
-                            ELEVATION_OFFSET // Regular buildings start at offset (z=3m = floor 01 level)
-                        ],
-                        'fill-extrusion-opacity': 0.9
+    <script>
+        // Basemap styles - Using reliable tile sources
+        const basemapStyles = {
+            'streets': {
+                "version": 8,
+                "sources": {
+                    "carto-positron": {
+                        "type": "raster",
+                        "tiles": ["https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png"],
+                        "tileSize": 256,
+                        "attribution": "© CartoDB"
                     }
-                });
+                },
+                "layers": [{
+                    "id": "positron-layer",
+                    "type": "raster",
+                    "source": "carto-positron"
+                }]
+            },
+            'satellite': {
+                "version": 8,
+                "sources": {
+                    "esri-satellite": {
+                        "type": "raster",
+                        "tiles": ["https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"],
+                        "tileSize": 256,
+                        "attribution": "© Google"
+                    }
+                },
+                "layers": [{
+                    "id": "esri-satellite-layer",
+                    "type": "raster",
+                    "source": "esri-satellite"
+                }]
+            },
+            'dark': {
+                "version": 8,
+                "sources": {
+                    "carto-dark": {
+                        "type": "raster",
+                        "tiles": ["https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png"],
+                        "tileSize": 256,
+                        "attribution": "© CartoDB"
+                    }
+                },
+                "layers": [{
+                    "id": "dark-layer",
+                    "type": "raster",
+                    "source": "carto-dark"
+                }]
+            },
+            'none': {
+                "version": 8,
+                "sources": {},
+                "layers": [{
+                    "id": "background",
+                    "type": "background",
+                    "paint": { "background-color": "#0f172a" }
+                }]
+            }
+        };
 
-                // --- 3. CHART ---
-                const pisoMap = {};
-                features.forEach(f => {
-                    const p = f.properties.codi_piso || 'N/D';
-                    pisoMap[p] = (pisoMap[p] || 0) + 1;
-                });
-                const labels = Object.keys(pisoMap).sort();
-                const data = labels.map(l => pisoMap[l]);
+        // Get saved basemap or default to 'dark'
+        const savedBasemap = localStorage.getItem('selectedBasemap') || 'dark';
 
-                document.getElementById('total-lotes').innerText = features.length.toLocaleString();
-                document.getElementById('total-sotanos').innerText = sotanoCount;
+        const map = new maplibregl.Map({
+            container: 'map',
+            style: basemapStyles[savedBasemap],
+            center: [-71.95, -13.535],
+            zoom: 16,
+            pitch: 60,
+            bearing: -20,
+            antialias: true
+        });
+        map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right'); // Zoom controls on bottom-right
 
-                new Chart(document.getElementById('pisoChart'), {
-                    type: 'bar',
-                    data: {
-                        labels,
-                        datasets: [{
-                            label: 'Lotes',
-                            data,
-                            backgroundColor: '#ef4444',
-                            borderRadius: 3,
-                            hoverBackgroundColor: '#dc2626',
-                            minBarLength: 3 // Minimum bar height for visibility
-                        }]
+        // Colors (Magma-ish for buildings)
+        const colors = ['#fde0dd', '#fa9fb5', '#e7e1ef', '#c994c7', '#dd1c77'];
+        // Or a cleaner sequential ramp
+        const rampColors = ['#FEF0D9', '#FDCC8A', '#FC8D59', '#E34A33', '#B30000'];
+
+        // Basement gradient colors (underground depth simulation)
+        const basementColors = {
+            '81': '#06b6d4', // Cyan claro - Sótano más superficial
+            '82': '#0284c7', // Azul medio - Profundidad media
+            '83': '#003597', // Azul oscuro - Más profundo
+            '84': '#075985', // Azul muy oscuro
+            '85': '#0c4a6e'  // Azul profundo
+        };
+
+        let isUnderground = false;
+
+        map.on('load', () => {
+            const features = alturas.features;
+
+            // Helper function to check if floor is mezzanine
+            const isMezzanine = (codi_piso) => {
+                return codi_piso === '71';
+            };
+
+            // Separate data for Stats
+            const positiveHeights = [];
+            let sotanoCount = 0;
+            let mezzanineCount = 0;
+            let maxHeight = 0;
+
+            features.forEach(f => {
+                const h = f.properties.altura;
+                const piso = f.properties.codi_piso;
+
+                if (h >= 0) {
+                    positiveHeights.push(h);
+                    maxHeight = Math.max(maxHeight, h);
+                }
+                if (h < 0) sotanoCount++;
+                if (piso === '71') mezzanineCount++;
+            });
+
+            // Natural Breaks for Positive Heights
+            let breaks = [0, 5, 10, 15, 20];
+            if (positiveHeights.length > 5) {
+                const clusters = ss.ckmeans(positiveHeights, 5);
+                breaks = clusters.map(c => c[c.length - 1]);
+            }
+
+            // --- 1. LEGEND ---
+            const legendDiv = document.getElementById('legend-content');
+            let prev = 0;
+            breaks.forEach((b, i) => {
+                const div = document.createElement('div');
+                div.className = 'legend-item';
+                div.innerHTML = `<div class="legend-color" style="background:${rampColors[i]}"></div> ${prev.toFixed(1)}m - ${b.toFixed(1)}m`;
+                legendDiv.appendChild(div);
+                prev = b;
+            });
+
+            // --- 2. LAYER LOGIC ---
+            // Color Logic: Gradient for basements by floor, Purple for mezzanine (71), gradient for buildings
+            const colorExpr = ['case',
+                // Mezzanine (entresuelo) - Purple to distinguish from regular floors
+                ['==', ['get', 'codi_piso'], '71'], '#8b5cf6',
+
+                // Basements - Gradient by floor level (simulating depth)
+                ['==', ['get', 'codi_piso'], '81'], basementColors['81'],
+                ['==', ['get', 'codi_piso'], '82'], basementColors['82'],
+                ['==', ['get', 'codi_piso'], '83'], basementColors['83'],
+                ['==', ['get', 'codi_piso'], '84'], basementColors['84'],
+                ['==', ['get', 'codi_piso'], '85'], basementColors['85'],
+
+                // Regular buildings - Gradient by height
+                ['step', ['get', 'altura'], rampColors[0],
+                    breaks[0], rampColors[1],
+                    breaks[1], rampColors[2],
+                    breaks[2], rampColors[3],
+                    breaks[3], rampColors[4]
+                ]
+            ];
+
+            // Debug: Log basement data
+            const basementFeatures = features.filter(f => f.properties.altura < 0);
+            console.log('=== BASEMENT DEBUG ===');
+            console.log('Total features:', features.length);
+            console.log('Basement features:', basementFeatures.length);
+            if (basementFeatures.length > 0) {
+                console.log('Sample basement:', basementFeatures[0].properties);
+                console.log('Sample altura:', basementFeatures[0].properties.altura);
+            }
+
+            // SOLUTION: MapLibre cannot render below z=0 (ground level)
+            // Use minimal offset (3m) to elevate buildings slightly
+            // Basements: Stack by floor code (codi_piso)
+            //   - Sótano 81: base=0m, height=2.75m (0-2.75m depth)
+            //   - Sótano 82: base=2.75m, height=5.5m (2.75-5.5m depth)
+            //   - Sótano 83: base=5.5m, height=8.25m (5.5-8.25m depth)
+            // This creates proper vertical stacking of basement levels
+
+            map.addSource('wanchaq', { type: 'geojson', data: alturas });
+
+            // GROUND_LEVEL: Offset to simulate underground (MapLibre can't render negative heights)
+            // We elevate everything so basements are at 0-10m, and regular floors start at 10m+
+            const GROUND_LEVEL = 10; // Ground level at 10m (allows 3+ basement levels below)
+
+            // Layer 1: Regular buildings and basements (opacity 90%)
+            map.addLayer({
+                'id': 'buildings-3d',
+                'type': 'fill-extrusion',
+                'source': 'wanchaq',
+                'filter': ['!=', ['get', 'codi_piso'], '71'], // Exclude mezzanine
+                'paint': {
+                    'fill-extrusion-color': colorExpr,
+                    'fill-extrusion-height': [
+                        'let',
+                        'piso', ['get', 'codi_piso'],
+                        'pisoNum', ['to-number', ['get', 'codi_piso']],
+                        [
+                            'case',
+                            // Sótanos (81, 82, 83) - stacked directly below floor 01
+                            ['>=', ['var', 'pisoNum'], 81],
+                            [
+                                'match',
+                                ['var', 'piso'],
+                                '81', GROUND_LEVEL,                // Sótano 81: 7.25-10m
+                                '82', ['-', GROUND_LEVEL, 2.75],   // Sótano 82: 4.5-7.25m
+                                '83', ['-', GROUND_LEVEL, 5.5],    // Sótano 83: 1.75-4.5m
+                                '84', ['-', GROUND_LEVEL, 8.25],   // Sótano 84
+                                '85', ['-', GROUND_LEVEL, 11.0],   // Sótano 85
+                                GROUND_LEVEL
+                            ],
+                            // Pisos regulares
+                            ['+', GROUND_LEVEL, ['+', ['*', ['-', ['var', 'pisoNum'], 1], 2.75], 2.75]]
+                        ]
+                    ],
+                    'fill-extrusion-base': [
+                        'let',
+                        'piso', ['get', 'codi_piso'],
+                        'pisoNum', ['to-number', ['get', 'codi_piso']],
+                        [
+                            'case',
+                            // Sótanos
+                            ['>=', ['var', 'pisoNum'], 81],
+                            [
+                                'match',
+                                ['var', 'piso'],
+                                '81', ['-', GROUND_LEVEL, 2.75],   // 7.25m
+                                '82', ['-', GROUND_LEVEL, 5.5],    // 4.5m
+                                '83', ['-', GROUND_LEVEL, 8.25],   // 1.75m
+                                '84', ['-', GROUND_LEVEL, 11.0],
+                                '85', ['-', GROUND_LEVEL, 13.75],
+                                ['-', GROUND_LEVEL, 2.75]
+                            ],
+                            // Pisos regulares
+                            ['+', GROUND_LEVEL, ['*', ['-', ['var', 'pisoNum'], 1], 2.75]]
+                        ]
+                    ],
+                    'fill-extrusion-opacity': 0.9
+                }
+            });
+
+            // Layer 2: Mezzanine (hidden by default, toggle with layer control)
+            map.addLayer({
+                'id': 'buildings-mezzanine',
+                'type': 'fill-extrusion',
+                'source': 'wanchaq',
+                'filter': ['==', ['get', 'codi_piso'], '71'], // Only mezzanine
+                'layout': {
+                    'visibility': 'none' // Hidden by default
+                },
+                'paint': {
+                    'fill-extrusion-color': '#8b5cf6', // Purple
+                    'fill-extrusion-height': ['+', GROUND_LEVEL, 2.75], // 12.75m (within floor 01)
+                    'fill-extrusion-base': ['+', GROUND_LEVEL, 0.75],    // 10.75m
+                    'fill-extrusion-opacity': 0.5 // Semi-transparent
+                }
+            });
+
+            // Layer 3: Mezzanine Outline (3D border at correct height)
+            map.addLayer({
+                'id': 'mezzanine-outline',
+                'type': 'fill-extrusion',
+                'source': 'wanchaq',
+                'filter': ['==', ['get', 'codi_piso'], '71'],
+                'layout': {
+                    'visibility': 'none' // Hidden by default
+                },
+                'paint': {
+                    'fill-extrusion-color': '#06b6d4', // Bright cyan
+                    'fill-extrusion-height': ['+', GROUND_LEVEL, 2.8], // Slightly taller: 12.8m
+                    'fill-extrusion-base': ['+', GROUND_LEVEL, 0.7],    // Slightly lower: 10.7m
+                    'fill-extrusion-opacity': 0.3 // Semi-transparent glow
+                }
+            }, 'buildings-mezzanine'); // Place behind mezzanine layer
+
+            // --- 3. CHART ---
+            const pisoMap = {};
+            features.forEach(f => {
+                const p = f.properties.codi_piso || 'N/D';
+                pisoMap[p] = (pisoMap[p] || 0) + 1;
+            });
+            const labels = Object.keys(pisoMap).sort();
+            const data = labels.map(l => pisoMap[l]);
+
+            // Color-code bars by floor type with gradient for basements
+            const barColors = labels.map(label => {
+                const num = parseInt(label);
+                // Basements - Use gradient colors
+                if (label === '81') return basementColors['81'];
+                if (label === '82') return basementColors['82'];
+                if (label === '83') return basementColors['83'];
+                if (label === '84') return basementColors['84'];
+                if (label === '85') return basementColors['85'];
+                if (num >= 81) return ''; // Fallback for other basements
+                if (label === '71') return '#8b5cf6'; // Mezzanine - Purple
+                return '#ef4444'; // Regular floors - Red
+            });
+
+            document.getElementById('total-lotes').innerText = features.length.toLocaleString();
+            document.getElementById('total-sotanos').innerText = sotanoCount;
+            document.getElementById('total-mezzanines').innerText = mezzanineCount;
+            document.getElementById('max-height').innerText = maxHeight.toFixed(2) + 'm';
+
+            new Chart(document.getElementById('pisoChart'), {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [{
+                        label: 'Pisos',
+                        data,
+                        backgroundColor: barColors,
+                        borderRadius: 3,
+                        hoverBackgroundColor: barColors.map(c => c === '#ef4444' ? '#dc2626' : c),
+                        minBarLength: 3 // Minimum bar height for visibility
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'nearest',
+                        intersect: false,
+                        axis: 'x'
                     },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        interaction: {
-                            mode: 'nearest',
-                            intersect: false,
-                            axis: 'x'
-                        },
-                        plugins: {
-                            legend: { display: false },
-                            tooltip: {
-                                enabled: true,
-                                backgroundColor: 'rgba(15, 23, 42, 0.95)',
-                                titleColor: '#f1f5f9',
-                                bodyColor: '#cbd5e1',
-                                borderColor: '#475569',
-                                borderWidth: 1,
-                                padding: 12,
-                                displayColors: false,
-                                callbacks: {
-                                    title: function (context) {
-                                        return 'Piso ' + context[0].label;
-                                    },
-                                    label: function (context) {
-                                        return 'Cantidad: ' + context.parsed.y + ' Pisos';
-                                    }
-                                }
-                            }
-                        },
-                        scales: {
-                            y: {
-                                beginAtZero: true,
-                                grid: { color: '#334155' },
-                                ticks: {
-                                    color: '#94a3b8',
-                                    font: { size: 10 },
-                                    precision: 0
-                                }
-                            },
-                            x: {
-                                grid: { display: false },
-                                ticks: {
-                                    color: '#94a3b8',
-                                    font: { size: 10 }
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            enabled: true,
+                            backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                            titleColor: '#f1f5f9',
+                            bodyColor: '#cbd5e1',
+                            borderColor: '#475569',
+                            borderWidth: 1,
+                            padding: 12,
+                            displayColors: false,
+                            callbacks: {
+                                title: function (context) {
+                                    return 'Piso ' + context[0].label;
+                                },
+                                label: function (context) {
+                                    return 'Cantidad: ' + context.parsed.y + ' Pisos';
                                 }
                             }
                         }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: '#334155' },
+                            ticks: {
+                                color: '#94a3b8',
+                                font: { size: 10 },
+                                precision: 0
+                            }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: {
+                                color: '#94a3b8',
+                                font: { size: 10 }
+                            }
+                        }
                     }
-                });
-
-                document.getElementById('loading').style.display = 'none';
+                }
             });
 
-            // --- INTERACTION ---
-            map.on('click', 'buildings-3d', (e) => {
-                const p = e.features[0].properties;
-                const codiPiso = p.codi_piso || '-';
-                const altura = Number(p.altura);
+            document.getElementById('loading').style.display = 'none';
+        });
 
-                // Determine floor type
-                const isSotano = altura < 0;
-                const isEntresuelo = codiPiso === '71';
+        // --- INTERACCIÓN ---
+        map.on('click', 'buildings-3d', (e) => {
+            const p = e.features[0].properties;
+            const codiPiso = p.codi_piso || '-';
+            const altura = Number(p.altura);
 
-                // Set title and badge
-                let title = "Detalle de Predio";
-                let badge = "";
-                let badgeColor = "#64748b";
+            // Determinar tipo de piso
+            const isSotano = altura < 0;
+            const isEntresuelo = codiPiso === '71'; // Entresuelo tiene código específico 71
 
-                if (isSotano) {
-                    title = "Detalle de Sótano";
-                    badge = "SÓTANO";
-                    badgeColor = "#3b82f6";
-                } else if (isEntresuelo) {
-                    title = "Detalle de Entresuelo";
-                    badge = "ENTRESUELO";
-                    badgeColor = "#8b5cf6";
-                }
+            // Configurar título e insignia
+            let title = "Detalle de Piso";
+            let badge = "";
+            let badgeColor = "#64748b";
 
-                // Get floor label
-                let floorLabel = codiPiso;
-                if (isSotano) {
-                    floorLabel = `Sótano (${codiPiso})`;
-                } else if (isEntresuelo) {
-                    floorLabel = 'Entresuelo';
-                } else if (codiPiso !== '-') {
-                    floorLabel = `Piso ${codiPiso}`;
-                }
+            if (isSotano) {
+                title = "Detalle de Sótano";
+                badge = "SÓTANO";
+                badgeColor = "#3b82f6";
+            } else if (isEntresuelo) {
+                title = "Detalle de Mezzanine";
+                badge = "MEZZANINE";
+                badgeColor = "#8b5cf6";
+            }
 
-                const html = `
+            // Obtener etiqueta del piso
+            let floorLabel = codiPiso;
+            if (isSotano) {
+                floorLabel = `Sótano (${codiPiso})`;
+            } else if (isEntresuelo) {
+                floorLabel = `Mezzanine (${codiPiso})`;
+            } else if (codiPiso !== '-') {
+                floorLabel = `Piso ${codiPiso}`;
+            }
+
+            const html = `
                 <div style="margin-bottom:10px;">
                     <div style="font-weight:700; color:#ef4444; font-size:0.95rem; margin-bottom:4px;">${title}</div>
                     ${badge ? `<div style="display:inline-block; background:${badgeColor}; color:white; padding:2px 8px; border-radius:3px; font-size:0.65rem; font-weight:600; letter-spacing:0.5px;">${badge}</div>` : ''}
@@ -518,7 +875,7 @@
                     </tr>
                     <tr>
                         <td style="color:#94a3b8; padding-right:12px;">Altura</td>
-                        <td style="font-weight:600; color:${isSotano ? '#3b82f6' : '#10b981'};">${altura.toFixed(2)} m</td>
+                        <td style="font-weight:600; color:${isSotano ? '#3b82f6' : (isEntresuelo ? '#8b5cf6' : '#10b981')};">${altura.toFixed(2)} m</td>
                     </tr>
                     ${p.area_grafica ? `<tr>
                         <td style="color:#94a3b8; padding-right:12px;">Área Gráfica</td>
@@ -526,89 +883,240 @@
                     </tr>` : ''}
                 </table>
             `;
-                new maplibregl.Popup({ closeButton: true, maxWidth: '280px' })
-                    .setLngLat(e.lngLat)
-                    .setHTML(html)
-                    .addTo(map);
+            new maplibregl.Popup({ closeButton: true, maxWidth: '280px' })
+                .setLngLat(e.lngLat)
+                .setHTML(html)
+                .addTo(map);
+        });
+
+        // Evento de clic para capa ENTRESUELO (buildings-mezzanine)
+        map.on('click', 'buildings-mezzanine', (e) => {
+            const p = e.features[0].properties;
+            const altura = Number(p.altura || 0);
+            const codiPiso = p.codi_piso || '-';
+
+            // Esta capa es específicamente para entresuelos/mezzanines
+            const title = 'Detalle de Mezzanine';
+            const badge = 'MEZZANINE';
+            const badgeColor = '#8b5cf6';
+            const floorLabel = `Mezzanine (${codiPiso})`;
+
+            const html = `
+                <div style="margin-bottom:10px;">
+                    <div style="font-weight:700; color:#8b5cf6; font-size:0.95rem; margin-bottom:4px;">${title}</div>
+                    <div style="display:inline-block; background:${badgeColor}; color:white; padding:2px 8px; border-radius:3px; font-size:0.65rem; font-weight:600; letter-spacing:0.5px;">${badge}</div>
+                </div>
+                <table class="prop-table" style="font-size:0.8rem;">
+                    <tr>
+                        <td style="color:#94a3b8; padding-right:12px;">Referencia Catastral</td>
+                        <td style="font-weight:500; color:#f1f5f9;">${p.id_lote || '-'}</td>
+                    </tr>
+                    <tr>
+                        <td style="color:#94a3b8; padding-right:12px;">Sector</td>
+                        <td style="font-weight:500; color:#f1f5f9;">${p.cod_sector || '-'}</td>
+                    </tr>
+                    <tr>
+                        <td style="color:#94a3b8; padding-right:12px;">Nivel</td>
+                        <td style="font-weight:500; color:#f1f5f9;">${floorLabel}</td>
+                    </tr>
+                    <tr>
+                        <td style="color:#94a3b8; padding-right:12px;">Altura</td>
+                        <td style="font-weight:600; color:#8b5cf6;">${altura.toFixed(2)} m</td>
+                    </tr>
+                    ${p.area_grafica ? `<tr>
+                        <td style="color:#94a3b8; padding-right:12px;">Área Gráfica</td>
+                        <td style="font-weight:500; color:#f1f5f9;">${Number(p.area_grafica).toFixed(2)} m²</td>
+                    </tr>` : ''}
+                </table>
+            `;
+            new maplibregl.Popup({ closeButton: true, maxWidth: '280px' })
+                .setLngLat(e.lngLat)
+                .setHTML(html)
+                .addTo(map);
+        });
+
+        // --- CONTROLS ---
+        function resetView() {
+            map.flyTo({ center: [-71.95, -13.535], zoom: 16, pitch: 60, bearing: -20 });
+
+            // Restore base map if in underground mode
+            if (isUnderground) {
+                toggleUnderground();
+            }
+        }
+        function togglePitch() {
+            map.easeTo({ pitch: map.getPitch() > 10 ? 0 : 60 });
+        }
+
+        function goToBasements() {
+            // Fly to a location with basements (from the data: sector 08, with codi_piso 81)
+            map.flyTo({
+                center: [-71.9458, -13.5378], // Area with basements
+                zoom: 19, // Closer zoom to see depth better
+                pitch: 75, // More dramatic angle to see depth
+                bearing: -60, // Better angle to see extrusion
+                duration: 2000
             });
 
-            // --- CONTROLS ---
-            function resetView() {
-                map.flyTo({ center: [-71.95, -13.535], zoom: 16, pitch: 60, bearing: -20 });
-
-                // Restore base map if in underground mode
-                if (isUnderground) {
-                    toggleUnderground();
+            // Activate underground view after a short delay
+            setTimeout(() => {
+                if (!isUnderground) {
                 }
+            }, 2100);
+        }
+
+        // Toggle layer control panel
+        function toggleLayerPanel() {
+            const panel = document.getElementById('layer-panel');
+            const btn = document.getElementById('btn-layers');
+
+            if (panel.style.display === 'none') {
+                panel.style.display = 'block';
+                btn.classList.add('btn-active');
+            } else {
+                panel.style.display = 'none';
+                btn.classList.remove('btn-active');
             }
-            function togglePitch() {
-                map.easeTo({ pitch: map.getPitch() > 10 ? 0 : 60 });
+        }
+
+        // Update floor visibility based on checkboxes
+        function updateFloorVisibility() {
+            const checkboxes = document.querySelectorAll('.floor-toggle');
+            const hiddenFloors = [];
+
+            checkboxes.forEach(cb => {
+                const floor = cb.dataset.floor;
+                if (!cb.checked) {
+                    hiddenFloors.push(floor);
+                }
+            });
+
+            // Special handling for mezzanine layers
+            const mezzanineCheckbox = document.getElementById('toggle-mezzanine');
+            if (mezzanineCheckbox) {
+                const visibility = mezzanineCheckbox.checked ? 'visible' : 'none';
+                map.setLayoutProperty('buildings-mezzanine', 'visibility', visibility);
+                map.setLayoutProperty('mezzanine-outline', 'visibility', visibility);
             }
 
-            function goToBasements() {
-                // Fly to a location with basements (from the data: sector 08, with codi_piso 81)
-                map.flyTo({
-                    center: [-71.9458, -13.5378], // Area with basements
-                    zoom: 19, // Closer zoom to see depth better
-                    pitch: 75, // More dramatic angle to see depth
-                    bearing: -60, // Better angle to see extrusion
-                    duration: 2000
+            // Update main buildings layer filter
+            if (hiddenFloors.length === 0) {
+                // Show all (except mezzanine which has its own layer)
+                map.setFilter('buildings-3d', ['!=', ['get', 'codi_piso'], '71']);
+            } else {
+                // Hide specific floors - build filter dynamically
+                const conditions = [
+                    'all',
+                    ['!=', ['get', 'codi_piso'], '71'] // Always exclude mezzanine from main layer
+                ];
+
+                // Add individual != conditions for each hidden floor
+                hiddenFloors.forEach(floor => {
+                    conditions.push(['!=', ['get', 'codi_piso'], floor]);
                 });
 
-                // Activate underground view after a short delay
-                setTimeout(() => {
-                    if (!isUnderground) {
-                        toggleUnderground();
+                map.setFilter('buildings-3d', conditions);
+            }
+        }
+
+        // Toggle all floors on/off
+        function toggleAllFloors(show) {
+            const checkboxes = document.querySelectorAll('.floor-toggle');
+            checkboxes.forEach(cb => {
+                cb.checked = show;
+            });
+            updateFloorVisibility();
+        }
+
+        // Toggle basemap panel
+        function toggleBasemapPanel() {
+            const panel = document.getElementById('basemap-panel');
+            const btn = document.getElementById('btn-basemap');
+
+            if (panel.style.display === 'none') {
+                panel.style.display = 'block';
+                btn.classList.add('btn-active');
+            } else {
+                panel.style.display = 'none';
+                btn.classList.remove('btn-active');
+            }
+        }
+
+
+
+        // Initialize floor toggle event listeners
+        document.addEventListener('DOMContentLoaded', () => {
+            const checkboxes = document.querySelectorAll('.floor-toggle');
+            checkboxes.forEach(cb => {
+                cb.addEventListener('change', updateFloorVisibility);
+            });
+        });
+        function toggleUnderground() {
+            isUnderground = !isUnderground;
+            const btn = document.getElementById('btn-underground');
+
+            if (isUnderground) {
+                btn.classList.add('btn-active');
+                // Make ALL base map layers transparent to see basements
+                map.getStyle().layers.forEach(layer => {
+                    // Skip our buildings layer
+                    if (layer.id === 'buildings-3d') return;
+
+                    // Make all other layers transparent
+                    if (layer.type === 'background') {
+                        map.setPaintProperty(layer.id, 'background-opacity', 0);
+                    } else if (layer.type === 'fill') {
+                        map.setPaintProperty(layer.id, 'fill-opacity', 0);
+                    } else if (layer.type === 'line') {
+                        map.setPaintProperty(layer.id, 'line-opacity', 0);
+                    } else if (layer.type === 'symbol') {
+                        map.setLayoutProperty(layer.id, 'visibility', 'none');
+                    } else if (layer.type === 'raster') {
+                        map.setPaintProperty(layer.id, 'raster-opacity', 0);
                     }
-                }, 2100);
+                });
+
+            } else {
+                btn.classList.remove('btn-active');
+                // Restore all base map layers
+                map.getStyle().layers.forEach(layer => {
+                    if (layer.id === 'buildings-3d') return;
+
+                    if (layer.type === 'background') {
+                        map.setPaintProperty(layer.id, 'background-opacity', 1);
+                    } else if (layer.type === 'fill') {
+                        map.setPaintProperty(layer.id, 'fill-opacity', 1);
+                    } else if (layer.type === 'line') {
+                        map.setPaintProperty(layer.id, 'line-opacity', 1);
+                    } else if (layer.type === 'symbol') {
+                        map.setLayoutProperty(layer.id, 'visibility', 'visible');
+                    } else if (layer.type === 'raster') {
+                        map.setPaintProperty(layer.id, 'raster-opacity', 1);
+                    }
+                });
             }
+        }
 
-            function toggleUnderground() {
-                isUnderground = !isUnderground;
-                const btn = document.getElementById('btn-underground');
+        // NEW: Reliable Basemap Switcher
+        function setBasemap(type) {
+            localStorage.setItem('selectedBasemap', type);
+            location.reload();
+        }
 
-                if (isUnderground) {
-                    btn.classList.add('btn-active');
-                    // Make ALL base map layers transparent to see basements
-                    map.getStyle().layers.forEach(layer => {
-                        // Skip our buildings layer
-                        if (layer.id === 'buildings-3d') return;
+        // Highlight active basemap on load
+        document.addEventListener('DOMContentLoaded', () => {
+            const current = localStorage.getItem('selectedBasemap') || 'dark';
 
-                        // Make all other layers transparent
-                        if (layer.type === 'background') {
-                            map.setPaintProperty(layer.id, 'background-opacity', 0);
-                        } else if (layer.type === 'fill') {
-                            map.setPaintProperty(layer.id, 'fill-opacity', 0);
-                        } else if (layer.type === 'line') {
-                            map.setPaintProperty(layer.id, 'line-opacity', 0);
-                        } else if (layer.type === 'symbol') {
-                            map.setLayoutProperty(layer.id, 'visibility', 'none');
-                        } else if (layer.type === 'raster') {
-                            map.setPaintProperty(layer.id, 'raster-opacity', 0);
-                        }
-                    });
-
-                } else {
-                    btn.classList.remove('btn-active');
-                    // Restore all base map layers
-                    map.getStyle().layers.forEach(layer => {
-                        if (layer.id === 'buildings-3d') return;
-
-                        if (layer.type === 'background') {
-                            map.setPaintProperty(layer.id, 'background-opacity', 1);
-                        } else if (layer.type === 'fill') {
-                            map.setPaintProperty(layer.id, 'fill-opacity', 1);
-                        } else if (layer.type === 'line') {
-                            map.setPaintProperty(layer.id, 'line-opacity', 1);
-                        } else if (layer.type === 'symbol') {
-                            map.setLayoutProperty(layer.id, 'visibility', 'visible');
-                        } else if (layer.type === 'raster') {
-                            map.setPaintProperty(layer.id, 'raster-opacity', 1);
-                        }
-                    });
-                }
+            // Update UI
+            document.querySelectorAll('.basemap-option').forEach(btn => {
+                btn.classList.remove('basemap-active');
+            });
+            const activeBtn = document.getElementById(`basemap-${current}`);
+            if (activeBtn) {
+                activeBtn.classList.add('basemap-active');
             }
-        </script>
+        });
+    </script>
 </body>
 
 </html>
