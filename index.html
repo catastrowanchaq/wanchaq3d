@@ -235,6 +235,150 @@
         .legend-color.mezzanine-highlight {
             animation: mezzanine-pulse 2s ease-in-out infinite;
         }
+
+        /* Search Box */
+        .search-container {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 25;
+            width: 400px;
+        }
+
+        .search-input-wrapper {
+            position: relative;
+            width: 100%;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 10px 40px 10px 12px;
+            background: rgba(15, 23, 42, 0.95);
+            border: 1px solid #475569;
+            border-radius: 6px;
+            color: #f1f5f9;
+            font-size: 0.85rem;
+            outline: none;
+            transition: all 0.2s;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        .search-input:focus {
+            border-color: #ef4444;
+            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+        }
+
+        .search-input::placeholder {
+            color: #64748b;
+        }
+
+        .search-icon {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #94a3b8;
+            cursor: pointer;
+            padding: 4px;
+            pointer-events: auto;
+            transition: color 0.2s;
+        }
+
+        .search-icon:hover {
+            color: #ef4444;
+        }
+
+        .clear-search {
+            position: absolute;
+            right: 35px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: #94a3b8;
+            cursor: pointer;
+            padding: 4px;
+            display: none;
+            font-size: 1rem;
+            transition: color 0.2s;
+        }
+
+        .clear-search:hover {
+            color: #ef4444;
+        }
+
+        .clear-search.visible {
+            display: block;
+        }
+
+        .autocomplete-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            margin-top: 4px;
+            background: rgba(15, 23, 42, 0.98);
+            border: 1px solid #475569;
+            border-radius: 6px;
+            max-height: 300px;
+            overflow-y: auto;
+            display: none;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+        }
+
+        .autocomplete-dropdown.visible {
+            display: block;
+        }
+
+        .autocomplete-item {
+            padding: 10px 12px;
+            cursor: pointer;
+            border-bottom: 1px solid #334155;
+            transition: background 0.2s;
+            font-size: 0.8rem;
+        }
+
+        .autocomplete-item:last-child {
+            border-bottom: none;
+        }
+
+        .autocomplete-item:hover,
+        .autocomplete-item.selected {
+            background: rgba(239, 68, 68, 0.1);
+        }
+
+        .autocomplete-item .ref-number {
+            color: #ef4444;
+            font-weight: 600;
+        }
+
+        .autocomplete-item .ref-details {
+            color: #94a3b8;
+            font-size: 0.75rem;
+            margin-top: 2px;
+        }
+
+        .no-results {
+            padding: 12px;
+            text-align: center;
+            color: #64748b;
+            font-size: 0.8rem;
+        }
+
+        /* Highlight animation for selected building */
+        @keyframes building-highlight-pulse {
+
+            0%,
+            100% {
+                opacity: 0.8;
+            }
+
+            50% {
+                opacity: 1;
+            }
+        }
     </style>
 </head>
 
@@ -250,6 +394,17 @@
         <div class="main-title">
             <h1>CATASTRO WANCHAQ</h1>
             <span>Modelo 3D - 2025</span>
+        </div>
+    </div>
+
+    <!-- SEARCH BOX -->
+    <div class="search-container">
+        <div class="search-input-wrapper">
+            <input type="text" id="search-input" class="search-input" placeholder="🔍 Buscar Referencia Catastral..."
+                autocomplete="off">
+            <button class="clear-search" id="clear-search" title="Limpiar búsqueda">✕</button>
+            <span class="search-icon">🔍</span>
+            <div class="autocomplete-dropdown" id="autocomplete-dropdown"></div>
         </div>
     </div>
 
@@ -1116,6 +1271,479 @@
                 activeBtn.classList.add('basemap-active');
             }
         });
+
+        // ===== INTELLIGENT SEARCH FUNCTIONALITY =====
+        let searchData = [];
+        let selectedHighlightId = null;
+
+        // Initialize search data when map is loaded
+        map.on('load', () => {
+            // Group features by id_lote
+            const groups = {};
+
+            alturas.features.forEach((feature, index) => {
+                const idLote = feature.properties.id_lote;
+                if (!idLote) return;
+
+                if (!groups[idLote]) {
+                    groups[idLote] = {
+                        id: idLote, // Use id_lote as the main ID
+                        refCatastral: idLote,
+                        sector: feature.properties.cod_sector || '',
+                        features: [], // Store all features for this building
+                        maxHeight: 0,
+                        floors: 0
+                    };
+                }
+
+                // Add feature to group
+                groups[idLote].features.push({
+                    geometry: feature.geometry,
+                    properties: feature.properties
+                });
+
+                // Update metadata
+                const h = Number(feature.properties.altura) || 0;
+                if (h > groups[idLote].maxHeight) {
+                    groups[idLote].maxHeight = h;
+                }
+                groups[idLote].floors++;
+            });
+
+            // Convert groups to array
+            searchData = Object.values(groups);
+            console.log(`Search index built with ${searchData.length} unique buildings`);
+        });
+
+        // Search input handler
+        const searchInput = document.getElementById('search-input');
+        const clearBtn = document.getElementById('clear-search');
+        const dropdown = document.getElementById('autocomplete-dropdown');
+        const searchIcon = document.querySelector('.search-icon');
+        let selectedIndex = -1;
+        let currentResults = [];
+
+        searchInput.addEventListener('focus', () => {
+            if (searchInput.value.trim() === '') {
+                showSuggestions();
+            }
+        });
+
+        searchInput.addEventListener('input', (e) => {
+            const query = e.target.value.trim();
+
+            // Show/hide clear button
+            if (query.length > 0) {
+                clearBtn.classList.add('visible');
+                // Filter results
+                const results = searchData.filter(item =>
+                    item.refCatastral.toLowerCase().includes(query.toLowerCase())
+                ).slice(0, 10); // Limit to 10 results
+                currentResults = results;
+                displayAutocomplete(results, query);
+            } else {
+                clearBtn.classList.remove('visible');
+                currentResults = []; // Clear current results
+                showSuggestions(); // Show suggestions again if cleared
+            }
+        });
+
+        // Clear search
+        clearBtn.addEventListener('click', () => {
+            searchInput.value = '';
+            clearBtn.classList.remove('visible');
+            dropdown.classList.remove('visible');
+
+            // Show suggestions
+            showSuggestions();
+            clearHighlight();
+            selectedIndex = -1;
+            currentResults = [];
+            searchInput.focus();
+        });
+
+        // Search icon click - trigger search
+        searchIcon.addEventListener('click', () => {
+            performSearch();
+        });
+
+        // Keyboard navigation
+        searchInput.addEventListener('keydown', (e) => {
+            const items = dropdown.querySelectorAll('.autocomplete-item');
+
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                selectedIndex = Math.min(selectedIndex + 1, items.length - 1);
+                updateSelection(items);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                selectedIndex = Math.max(selectedIndex - 1, -1);
+                updateSelection(items);
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (selectedIndex >= 0 && items[selectedIndex]) {
+                    items[selectedIndex].click();
+                } else {
+                    // No dropdown selection, perform direct search
+                    performSearch();
+                }
+            } else if (e.key === 'Escape') {
+                dropdown.classList.remove('visible');
+                selectedIndex = -1;
+            }
+        });
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.search-input-wrapper')) {
+                dropdown.classList.remove('visible');
+                selectedIndex = -1;
+            }
+        });
+
+        function performSearch() {
+            const query = searchInput.value.trim();
+
+            if (!query) {
+                return;
+            }
+
+            // Try to find exact match first
+            let match = searchData.find(item =>
+                item.refCatastral.toLowerCase() === query.toLowerCase()
+            );
+
+            // If no exact match, try partial match
+            if (!match && currentResults.length > 0) {
+                match = currentResults[0];
+            }
+
+            // If still no match, search all data
+            if (!match) {
+                match = searchData.find(item =>
+                    item.refCatastral.toLowerCase().includes(query.toLowerCase())
+                );
+            }
+
+            if (match) {
+                selectBuilding(match);
+            } else {
+                // Show error or "not found" message
+                alert('No se encontró la referencia catastral: ' + query);
+            }
+        }
+
+        function showSuggestions() {
+            // Get top 5 tallest buildings
+            const topBuildings = [...searchData]
+                .sort((a, b) => b.maxHeight - a.maxHeight)
+                .slice(0, 5);
+
+            dropdown.innerHTML = '';
+            selectedIndex = -1;
+
+            if (topBuildings.length === 0) return;
+
+            // Add Header
+            const header = document.createElement('div');
+            header.style.padding = '8px 12px';
+            header.style.color = '#fbbf24';
+            header.style.fontSize = '0.75rem';
+            header.style.fontWeight = '600';
+            header.style.textTransform = 'uppercase';
+            header.style.borderBottom = '1px solid rgba(255,255,255,0.05)';
+            header.textContent = '🔥 Top Edificios (Sugerencias)';
+            dropdown.appendChild(header);
+
+            topBuildings.forEach((item, index) => {
+                const div = document.createElement('div');
+                div.className = 'autocomplete-item';
+                div.dataset.index = index;
+
+                div.innerHTML = `
+                    <div class="ref-number">${item.refCatastral}</div>
+                    <div class="ref-details">Sector: ${item.sector} | ${item.floors} Pisos | <span style="color:#10b981">Top: ${item.maxHeight.toFixed(2)}m</span></div>
+                `;
+
+                div.addEventListener('click', () => {
+                    selectBuilding(item);
+                });
+
+                dropdown.appendChild(div);
+            });
+
+            dropdown.classList.add('visible');
+        }
+
+        function displayAutocomplete(results, query) {
+            dropdown.innerHTML = '';
+            selectedIndex = -1;
+
+            if (results.length === 0) {
+                dropdown.innerHTML = '<div class="no-results">No se encontraron resultados</div>';
+                dropdown.classList.add('visible');
+                return;
+            }
+
+            results.forEach((item, index) => {
+                const div = document.createElement('div');
+                div.className = 'autocomplete-item';
+                div.dataset.index = index;
+
+                // Ensure maxHeight has a value
+                const heightVal = (item.maxHeight !== undefined && item.maxHeight !== null) ? item.maxHeight : 0;
+
+                div.innerHTML = `
+                    <div class="ref-number">${item.refCatastral}</div>
+                    <div class="ref-details">Sector: ${item.sector || '-'} | ${item.floors} Registros | Max Altura: ${heightVal.toFixed(2)}m</div>
+                `;
+
+                div.addEventListener('click', () => {
+                    selectBuilding(item);
+                });
+
+                dropdown.appendChild(div);
+            });
+
+            dropdown.classList.add('visible');
+        }
+
+        function updateSelection(items) {
+            items.forEach((item, index) => {
+                if (index === selectedIndex) {
+                    item.classList.add('selected');
+                    item.scrollIntoView({ block: 'nearest' });
+                } else {
+                    item.classList.remove('selected');
+                }
+            });
+        }
+
+        function selectBuilding(item) {
+            // Close dropdown
+            dropdown.classList.remove('visible');
+            searchInput.value = item.refCatastral;
+
+            // Get coordinates from the FIRST feature (usually ground floor)
+            const mainFeature = item.features[0];
+            const coordinates = getBuildingCenter(mainFeature.geometry);
+
+            if (!coordinates) {
+                console.error('Could not get building coordinates');
+                return;
+            }
+
+            // Fly to building with more dramatic "Cartographic" view
+            map.flyTo({
+                center: coordinates,
+                zoom: 20.5,
+                pitch: 50,
+                bearing: -45,
+                duration: 2500,
+                essential: true
+            });
+
+            // Highlight building after animation
+            setTimeout(() => {
+                highlightBuilding(item);
+
+                // Show basic info popup for the building
+                showGroupPopup(item, coordinates);
+            }, 2600);
+        }
+
+        function getBuildingCenter(geometry) {
+            if (!geometry || !geometry.coordinates) {
+                return null;
+            }
+
+            let points = [];
+
+            if (geometry.type === 'Polygon') {
+                // Polygon: coordinates = [ [ [lng, lat], ... ] ]
+                // Index 0 is the outer ring
+                points = geometry.coordinates[0];
+            } else if (geometry.type === 'MultiPolygon') {
+                // MultiPolygon: coordinates = [ [ [ [lng, lat], ... ] ], ... ]
+                // Index [0][0] is the outer ring of the first polygon
+                // We'll use the largest polygon or just the first one for the center
+                if (geometry.coordinates[0] && geometry.coordinates[0][0]) {
+                    points = geometry.coordinates[0][0];
+                }
+            }
+
+            if (!points || points.length === 0) return null;
+
+            // Calculate centroid of the points
+            let sumX = 0, sumY = 0;
+            let validPoints = 0;
+
+            points.forEach(coord => {
+                if (Array.isArray(coord) && coord.length >= 2) {
+                    sumX += coord[0];
+                    sumY += coord[1];
+                    validPoints++;
+                }
+            });
+
+            if (validPoints === 0) return null;
+
+            return [sumX / validPoints, sumY / validPoints];
+        }
+
+        function highlightBuilding(groupItem) {
+            // Clear previous highlight
+            clearHighlight();
+
+            // Create FeatureCollection with ALL features from the group
+            const features = groupItem.features.map(f => ({
+                type: 'Feature',
+                geometry: f.geometry,
+                properties: f.properties
+            }));
+
+            const highlightGeoJSON = {
+                type: 'FeatureCollection',
+                features: features
+            };
+
+            // Add source for the whole building (all floors)
+            if (!map.getSource('selected-building')) {
+                map.addSource('selected-building', {
+                    type: 'geojson',
+                    data: highlightGeoJSON
+                });
+            } else {
+                map.getSource('selected-building').setData(highlightGeoJSON);
+            }
+
+            const GROUND_LEVEL = 10;
+
+            // 1. BEACON EFFECT: Extruded transparent pillar (Use the first feature/boundary to avoid multiple beams)
+            // We create a separate source for the beacon using just one geometry
+            const beaconGeoJSON = {
+                type: 'FeatureCollection',
+                features: [{
+                    type: 'Feature',
+                    geometry: groupItem.features[0].geometry,
+                    properties: {}
+                }]
+            };
+
+            if (!map.getSource('selected-beacon-source')) {
+                map.addSource('selected-beacon-source', {
+                    type: 'geojson',
+                    data: beaconGeoJSON
+                });
+            } else {
+                map.getSource('selected-beacon-source').setData(beaconGeoJSON);
+            }
+
+            // Beacon Layer
+            if (!map.getLayer('selected-building-beacon')) {
+                map.addLayer({
+                    id: 'selected-building-beacon',
+                    type: 'fill-extrusion',
+                    source: 'selected-beacon-source',
+                    paint: {
+                        'fill-extrusion-color': '#f59e0b',
+                        'fill-extrusion-height': 150,
+                        'fill-extrusion-base': GROUND_LEVEL,
+                        'fill-extrusion-opacity': 0.3
+                    }
+                });
+            }
+
+            // 2. GLOWING OUTLINE (All features/floors)
+            if (!map.getLayer('selected-building-outline')) {
+                map.addLayer({
+                    id: 'selected-building-outline',
+                    type: 'line',
+                    source: 'selected-building',
+                    paint: {
+                        'line-color': '#fbbf24',
+                        'line-width': 6,
+                        'line-blur': 2,
+                        'line-opacity': 1
+                    }
+                });
+            }
+
+            selectedHighlightId = groupItem.id;
+
+            // Pulse animation for the Beacon
+            let opacity = 0.2;
+            let increasing = true;
+            const pulseInterval = setInterval(() => {
+                if (!map.getLayer('selected-building-beacon')) {
+                    clearInterval(pulseInterval);
+                    return;
+                }
+
+                if (increasing) {
+                    opacity += 0.015;
+                    if (opacity >= 0.5) increasing = false;
+                } else {
+                    opacity -= 0.015;
+                    if (opacity <= 0.2) increasing = true;
+                }
+
+                map.setPaintProperty('selected-building-beacon', 'fill-extrusion-opacity', opacity);
+            }, 50);
+
+            window.highlightPulseInterval = pulseInterval;
+        }
+
+        function clearHighlight() {
+            if (window.highlightPulseInterval) {
+                clearInterval(window.highlightPulseInterval);
+                window.highlightPulseInterval = null;
+            }
+
+            if (map.getLayer('selected-building-outline')) map.removeLayer('selected-building-outline');
+            if (map.getLayer('selected-building-beacon')) map.removeLayer('selected-building-beacon');
+            if (map.getSource('selected-building')) map.removeSource('selected-building');
+            if (map.getSource('selected-beacon-source')) map.removeSource('selected-beacon-source');
+
+            selectedHighlightId = null;
+        }
+
+        function showGroupPopup(item, coordinates) {
+            const html = `
+                <div style="margin-bottom:10px;">
+                    <div style="font-weight:700; color:#fbbf24; font-size:0.95rem; margin-bottom:4px;">🎯 Edificio Seleccionado</div>
+                </div>
+                <table class="prop-table" style="font-size:0.8rem;">
+                    <tr>
+                        <td style="color:#94a3b8; padding-right:12px;">Referencia Catastral</td>
+                        <td style="font-weight:600; color:#fbbf24;">${item.refCatastral}</td>
+                    </tr>
+                    <tr>
+                        <td style="color:#94a3b8; padding-right:12px;">Sector</td>
+                        <td style="font-weight:500; color:#f1f5f9;">${item.sector}</td>
+                    </tr>
+                    <tr>
+                        <td style="color:#94a3b8; padding-right:12px;">Total Unidades/Pisos</td>
+                        <td style="font-weight:500; color:#f1f5f9;">${item.floors}</td>
+                    </tr>
+                    <tr>
+                        <td style="color:#94a3b8; padding-right:12px;">Altura Máxima</td>
+                        <td style="font-weight:600; color:#10b981;">${item.maxHeight.toFixed(2)} m</td>
+                    </tr>
+                </table>
+            `;
+
+            new maplibregl.Popup({
+                closeButton: true,
+                maxWidth: '280px',
+                closeOnClick: false
+            })
+                .setLngLat(coordinates)
+                .setHTML(html)
+                .addTo(map);
+        }
+
+
     </script>
 </body>
 
